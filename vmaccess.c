@@ -43,9 +43,9 @@ static void vmem_init(void) {
  *****************************************************************************************
  *  @brief      This function does aging for aging page replacement algorithm.
  *              It will be called periodic based on g_count.
- *              This function must be used only when aging page replacement algorithm is activ.
+ *              This function must be used only when aging page replacement algorithm is active.
  *              Otherwise update_age_reset_ref may interfere with other page replacement 
- *              alogrithms that base on PTF_REF bit.
+ *              algorithms that base on PTF_REF bit.
  *
  *  @return     void
  ****************************************************************************************/
@@ -64,6 +64,10 @@ static void update_age_reset_ref(void) {
 static void vmem_put_page_into_mem(int address) {
 	int page_idx = address / VMEM_PAGESIZE;
 	if((vmem->pt.entries[page_idx].flags & PTF_PRESENT) == 0) {
+		if(vmem->adm.page_rep_algo == VMEM_ALGO_AGING)
+		{
+			update_age_reset_ref();
+		}
 			vmem->adm.pf_count++;
 			vmem->adm.req_pageno = page_idx;
 			// mmanage signal
