@@ -202,7 +202,7 @@ static struct vmem_struct *vmem;// = NULL; //!< Reference to shared memory
 static int signal_number = 0;           //!< Number of signal received last
 static sem_t *local_sem = NULL;                //!< OS-X Named semaphores will be stored locally due to pointer
 pid_t mmanage_id;
-int removedFrames;
+int replacedFrame;
 
 int main(int argc, char **argv) {
     struct sigaction sigact;
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
 
     // scan parameter 
     vmem->adm.program_name = argv[0];
-    vmem->adm.page_rep_algo = VMEM_ALGO_FIFO;
+    vmem->adm.page_rep_algo = VMEM_ALGO_AGING;
     scan_params(argc, argv);
 
     /* Setup signal handler */
@@ -296,7 +296,6 @@ void print_usage_info_and_exit(char *err_str) {
 void sighandler(int signo) {
     signal_number = signo;
     if(signo == SIGUSR1) {
-    	printf("signal erhalten \n");
         allocate_page();
     } else if(signo == SIGUSR2) {
         dump_pt();
@@ -347,9 +346,8 @@ void vmem_init(void) {
 		vmem->adm.page_rep_algo = VMEM_ALGO_CLOCK;
 		vmem->adm.next_alloc_idx = 0;
 
-		removedFrames = VOID_IDX;
+		replacedFrame = VOID_IDX;
 	    //virtual memory
-		printf("init done\n");
 }
 
 int find_free_frame() {
@@ -368,10 +366,11 @@ void allocate_page(void) {
 	int freeFrameIdx = find_free_frame();
 	if(freeFrameIdx == -1) {
 		freeFrameIdx = find_remove_frame();
-		printf("seite %d ersetzt\n", freeFrameIdx);
-		removedFrames++;
 		vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags &= ~PTF_PRESENT;
-		store_page(freeFrameIdx);
+		replacedFrame = vmem->pt.framepage[freeFrameIdx];
+//		if(vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags & PTF_DIRTY == PTF_DIRTY) {
+			store_page(freeFrameIdx);
+//		}
 
 	}
 		update_pt(freeFrameIdx);
@@ -379,7 +378,6 @@ void allocate_page(void) {
 		vmem->pt.entries[vmem->adm.req_pageno].flags |= PTF_PRESENT;
 
 		dump_pt();
-		printf("vor sem_post\n");
 		sem_post(local_sem);
 }
 
@@ -423,15 +421,25 @@ int find_remove_fifo(void) {
 int find_remove_clock(void) {
 	int virtualPageIdx = vmem->pt.framepage[vmem->adm.next_alloc_idx];
 	while((vmem->pt.entries[virtualPageIdx].flags & PTF_REF) == PTF_REF) {
-		vmem->pt.entries[virtualPageIdx].flags = vmem->pt.entries[virtualPageIdx].flags & ~PTF_REF; //set reference bit 0
-		vmem->adm.next_alloc_idx++;
+		vmem->pt.entries[virtualPageIdx].flags &= ~PTF_REF; //set reference bit 0
+		vmem->adm.next_alloc_idx = (vmem->adm.next_alloc_idx + 1) % VMEM_NFRAMES;
 		virtualPageIdx = vmem->pt.framepage[vmem->adm.next_alloc_idx];
 	}
-	vmem->adm.next_alloc_idx++;
-	return vmem->adm.next_alloc_idx - 1;
+	int res = vmem->adm.next_alloc_idx;
+	vmem->adm.next_alloc_idx = (vmem->adm.next_alloc_idx + 1) % VMEM_NFRAMES;
+	return res;
 }
 
 int find_remove_aging(void) {
+	int res = vmem->pt.framepage[0];
+	int i;
+	for(i = 1; i < VMEM_NFRAMES; i++) {
+		int virtualPageIdx = vmem->pt.framepage[i];
+		if(vmem->pt.entries[virtualPageIdx].age < vmem->pt.entries[res].age) {
+			res = virtualPageIdx;
+		}
+	}
+	return vmem->pt.entries[res].frame;
 }
 
 void cleanup(void) {
@@ -445,7 +453,7 @@ void dump_pt(void) {
 	logEvent.alloc_frame = vmem->pt.entries[vmem->adm.req_pageno].frame; //die physikalische Seite die allokiert wurde
 	logEvent.g_count = vmem->adm.g_count; //global-count
 	logEvent.pf_count = vmem->adm.pf_count; //page fault count
-	logEvent.replaced_page = removedFrames; //wie viele frames wurden bisher geloescht
+	logEvent.replaced_page = replacedFrame; //wie viele frames wurden bisher geloescht
 	logEvent.req_pageno = vmem->adm.req_pageno; //die vituelle seite die geladen werden sollte
 
 	logger(logEvent);

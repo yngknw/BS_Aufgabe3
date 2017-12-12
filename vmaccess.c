@@ -50,6 +50,18 @@ static void vmem_init(void) {
  *  @return     void
  ****************************************************************************************/
 static void update_age_reset_ref(void) {
+	int referencedBit;
+	int virtualPage;
+	int i;
+	for(i = 0; i < VMEM_NFRAMES; i++) {
+		virtualPage = vmem->pt.framepage[i];
+		if(virtualPage != VOID_IDX) {
+			referencedBit = vmem->pt.entries[virtualPage].flags & PTF_REF;
+			(vmem->pt.entries[virtualPage].age = vmem->pt.entries[virtualPage].age >> 1);
+			referencedBit = referencedBit << 5;
+			vmem->pt.entries[virtualPage].age |= referencedBit;
+		}
+	}
 }
 
 /**
@@ -64,15 +76,11 @@ static void update_age_reset_ref(void) {
 static void vmem_put_page_into_mem(int address) {
 	int page_idx = address / VMEM_PAGESIZE;
 	if((vmem->pt.entries[page_idx].flags & PTF_PRESENT) == 0) {
-		if(vmem->adm.page_rep_algo == VMEM_ALGO_AGING)
-		{
-			update_age_reset_ref();
-		}
-			vmem->adm.pf_count++;
-			vmem->adm.req_pageno = page_idx;
-			// mmanage signal
-			kill(vmem->adm.mmanage_pid, SIGUSR1);
-			sem_wait(sem_open(NAMED_SEM, 0));
+		vmem->adm.pf_count++;
+		vmem->adm.req_pageno = page_idx;
+		// mmanage signal
+		kill(vmem->adm.mmanage_pid, SIGUSR1);
+		sem_wait(sem_open(NAMED_SEM, 0));
 	}
 	vmem->adm.g_count++;
 }
@@ -84,8 +92,11 @@ int vmem_read(int address) {
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
 	vmem_put_page_into_mem(address);
-	page_idx = vmem->pt.entries[page_idx].frame;
 	vmem->pt.entries[page_idx].flags |= PTF_REF;
+	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0) {
+		update_age_reset_ref();
+	}
+	page_idx = vmem->pt.entries[page_idx].frame;
 	return vmem->data[(page_idx * VMEM_PAGESIZE) + offset];
 }
 
@@ -98,9 +109,12 @@ void vmem_write(int address, int data) {
 
 	vmem_put_page_into_mem(address);
 
-	int frame_idx = vmem->pt.entries[page_idx].frame;
 	vmem->pt.entries[page_idx].flags |= PTF_DIRTY; //seite wurde beschrieben
 	vmem->pt.entries[page_idx].flags |= PTF_REF; //seite wurde referenziert
+	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0) {
+		update_age_reset_ref();
+	}
+	int frame_idx = vmem->pt.entries[page_idx].frame;
 	vmem->data[(frame_idx * VMEM_PAGESIZE) + offset] = data;
 
 }
