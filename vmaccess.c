@@ -57,9 +57,15 @@ static void update_age_reset_ref(void) {
 		virtualPage = vmem->pt.framepage[i];
 		if(virtualPage != VOID_IDX) {
 			referencedBit = vmem->pt.entries[virtualPage].flags & PTF_REF;
-			(vmem->pt.entries[virtualPage].age = vmem->pt.entries[virtualPage].age >> 1);
-			referencedBit = referencedBit << 5;
+//			printf("referenced bit: %d, age: %d \n" , referencedBit, vmem->pt.entries[virtualPage].age);
+			vmem->pt.entries[virtualPage].age = (vmem->pt.entries[virtualPage].age / 2);
+//			printf("rechtsshift: %d \n", vmem->pt.entries[virtualPage].age);
+			referencedBit = referencedBit * 32;
+//			printf("referenced bit linksshift: %d\n", referencedBit);
 			vmem->pt.entries[virtualPage].age |= referencedBit;
+			vmem->pt.entries[virtualPage].flags &= ~PTF_REF;
+//			printf("new age: %d\n", vmem->pt.entries[virtualPage].age);
+
 		}
 	}
 }
@@ -82,6 +88,7 @@ static void vmem_put_page_into_mem(int address) {
 		kill(vmem->adm.mmanage_pid, SIGUSR1);
 		sem_wait(sem_open(NAMED_SEM, 0));
 	}
+
 	vmem->adm.g_count++;
 }
 
