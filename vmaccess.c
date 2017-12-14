@@ -99,8 +99,9 @@ int vmem_read(int address) {
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
 	vmem_put_page_into_mem(address);
+
 	vmem->pt.entries[page_idx].flags |= PTF_REF;
-	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0) {
+	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0 && vmem->adm.page_rep_algo == VMEM_ALGO_AGING) {
 		update_age_reset_ref();
 	}
 	page_idx = vmem->pt.entries[page_idx].frame;
@@ -111,6 +112,18 @@ void vmem_write(int address, int data) {
 	if(vmem == NULL) {
 		vmem_init();
 	}
+//	if(vmem->pt.framepage[15] != VOID_IDX)
+//	{
+////		int i;
+////		printf("\n");
+////		printf("%d\n", vmem->adm.next_alloc_idx);
+////		for(i = 0; i < VMEM_NFRAMES; i++) {
+////			printf("virAdr: %d: physAdr: %d  \n", vmem->pt.framepage[i], vmem->pt.entries[vmem->pt.framepage[i]].frame );
+////			printf("r-bit: %d \n", vmem->pt.entries[vmem->pt.framepage[i]].flags & PTF_REF);
+////	//				printf("replacedFrame: %d\n");
+////			}
+//	}
+
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
 
@@ -118,11 +131,14 @@ void vmem_write(int address, int data) {
 
 	vmem->pt.entries[page_idx].flags |= PTF_DIRTY; //seite wurde beschrieben
 	vmem->pt.entries[page_idx].flags |= PTF_REF; //seite wurde referenziert
-	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0) {
+	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0 && vmem->adm.page_rep_algo == VMEM_ALGO_AGING) {
 		update_age_reset_ref();
 	}
 	int frame_idx = vmem->pt.entries[page_idx].frame;
 	vmem->data[(frame_idx * VMEM_PAGESIZE) + offset] = data;
+
+
+
 
 }
 

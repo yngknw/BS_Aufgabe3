@@ -344,7 +344,7 @@ void vmem_init(void) {
 		vmem->adm.pf_count = 0;
 		vmem->adm.req_pageno = -1;
 		vmem->adm.shm_id = 0;
-		vmem->adm.page_rep_algo = VMEM_ALGO_CLOCK;
+		vmem->adm.page_rep_algo = VMEM_ALGO_FIFO;
 		vmem->adm.next_alloc_idx = 0;
 
 		replacedFrame = VOID_IDX;
@@ -369,16 +369,13 @@ void allocate_page(void) {
 		freeFrameIdx = find_remove_frame();
 		vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags &= ~PTF_PRESENT;
 		replacedFrame = vmem->pt.framepage[freeFrameIdx];
-
 		if((vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags & PTF_DIRTY) == PTF_DIRTY) {
 			store_page(freeFrameIdx);
 		}
 	}
-	update_pt(freeFrameIdx);
-	vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].age = 128;
-	fetch_page(vmem->adm.req_pageno);
-	vmem->pt.entries[vmem->adm.req_pageno].flags |= PTF_PRESENT;
 
+	update_pt(freeFrameIdx);
+	fetch_page(vmem->adm.req_pageno);
 	dump_pt();
 	sem_post(local_sem);
 }
@@ -393,10 +390,10 @@ void store_page(int pt_idx) {
 }
 
 void update_pt(int frame) {
-	// in virtuelle seitentabelle zugehörige physikalische seite eintragen
 	int pt_idx = vmem->adm.req_pageno;
 	vmem->pt.entries[pt_idx].frame = frame;
 	vmem->pt.entries[pt_idx].flags |= PTF_PRESENT;
+	vmem->pt.entries[pt_idx].age = 128;
 	vmem->pt.framepage[frame] = pt_idx;
 }
 
@@ -427,24 +424,16 @@ int find_remove_clock(void) {
 		vmem->adm.next_alloc_idx = (vmem->adm.next_alloc_idx + 1) % VMEM_NFRAMES;
 		virtualPageIdx = vmem->pt.framepage[vmem->adm.next_alloc_idx];
 	}
-	int res = vmem->adm.next_alloc_idx;
+	int result = vmem->pt.entries[virtualPageIdx].frame;
 	vmem->adm.next_alloc_idx = (vmem->adm.next_alloc_idx + 1) % VMEM_NFRAMES;
-	return res;
+	return result;
 }
 
 int find_remove_aging(void) {
 	int res = vmem->pt.framepage[0];
 	int i = 0;
-//	if(vmem->adm.g_count < 500)
-//	{
-//		printf("count: %d \n ages: \n", vmem->adm.g_count);
-//		printf("%d: %d\n", i, vmem->pt.entries[res].age);
-//	}
 	for(i = 1; i < VMEM_NFRAMES; i++) {
 		int virtualPageIdx = vmem->pt.framepage[i];
-//		if(vmem->adm.g_count < 500) {
-//			printf("%d: %d\n", i, vmem->pt.entries[virtualPageIdx].age);
-//		}
 		if(vmem->pt.entries[virtualPageIdx].age <= vmem->pt.entries[res].age) {
 			res = virtualPageIdx;
 		}
@@ -463,7 +452,7 @@ void dump_pt(void) {
 	logEvent.alloc_frame = vmem->pt.entries[vmem->adm.req_pageno].frame; //die physikalische Seite die allokiert wurde
 	logEvent.g_count = vmem->adm.g_count; //global-count
 	logEvent.pf_count = vmem->adm.pf_count; //page fault count
-	logEvent.replaced_page = replacedFrame; //welches frame wurde geloescht
+	logEvent.replaced_page = replacedFrame; //welche virtuelle seite wurde geloescht
 	logEvent.req_pageno = vmem->adm.req_pageno; //die virtuelle seite die geladen werden sollte
 
 	logger(logEvent);
