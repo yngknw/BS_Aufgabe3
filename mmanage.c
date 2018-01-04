@@ -363,14 +363,14 @@ int find_free_frame() {
 
 void allocate_page(void) {
 
-
 	int freeFrameIdx = find_free_frame();
 	if(freeFrameIdx == -1) {
 		freeFrameIdx = find_remove_frame();
-		vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags &= ~PTF_PRESENT;
 		replacedFrame = vmem->pt.framepage[freeFrameIdx];
+		vmem->pt.entries[replacedFrame].flags &= ~PTF_PRESENT;
 		if((vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags & PTF_DIRTY) == PTF_DIRTY) {
 			store_page(freeFrameIdx);
+			vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags &= ~PTF_DIRTY;
 		}
 	}
 

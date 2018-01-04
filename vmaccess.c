@@ -57,15 +57,10 @@ static void update_age_reset_ref(void) {
 		virtualPage = vmem->pt.framepage[i];
 		if(virtualPage != VOID_IDX) {
 			referencedBit = vmem->pt.entries[virtualPage].flags & PTF_REF;
-//			printf("referenced bit: %d, age: %d \n" , referencedBit, vmem->pt.entries[virtualPage].age);
 			vmem->pt.entries[virtualPage].age = (vmem->pt.entries[virtualPage].age / 2);
-//			printf("rechtsshift: %d \n", vmem->pt.entries[virtualPage].age);
 			referencedBit = referencedBit * 32;
-//			printf("referenced bit linksshift: %d\n", referencedBit);
 			vmem->pt.entries[virtualPage].age |= referencedBit;
 			vmem->pt.entries[virtualPage].flags &= ~PTF_REF;
-//			printf("new age: %d\n", vmem->pt.entries[virtualPage].age);
-
 		}
 	}
 }
@@ -112,17 +107,6 @@ void vmem_write(int address, int data) {
 	if(vmem == NULL) {
 		vmem_init();
 	}
-//	if(vmem->pt.framepage[15] != VOID_IDX)
-//	{
-////		int i;
-////		printf("\n");
-////		printf("%d\n", vmem->adm.next_alloc_idx);
-////		for(i = 0; i < VMEM_NFRAMES; i++) {
-////			printf("virAdr: %d: physAdr: %d  \n", vmem->pt.framepage[i], vmem->pt.entries[vmem->pt.framepage[i]].frame );
-////			printf("r-bit: %d \n", vmem->pt.entries[vmem->pt.framepage[i]].flags & PTF_REF);
-////	//				printf("replacedFrame: %d\n");
-////			}
-//	}
 
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
