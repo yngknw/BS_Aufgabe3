@@ -25,6 +25,4 @@ clean:
 	rm -rf mmanage vmappl
 	rm -rf logfile.txt pagefile.bin
 
-.PHONY: deps
-deps: 	
-	$(CC) $(CFLAGS) $(SRC) > makefile.dependencies
+
