@@ -74,16 +74,14 @@ static void update_age_reset_ref(void) {
  * 
  *  @return     void
  ****************************************************************************************/
-static void vmem_put_page_into_mem(int address) {
-	int page_idx = address / VMEM_PAGESIZE;
-	if((vmem->pt.entries[page_idx].flags & PTF_PRESENT) == 0) {
+static void vmem_put_page_into_mem(int page) {
+	if((vmem->pt.entries[page].flags & PTF_PRESENT) == 0) {
 		vmem->adm.pf_count++;
-		vmem->adm.req_pageno = page_idx;
-		// mmanage signal
+		vmem->adm.req_pageno = page;
+
 		kill(vmem->adm.mmanage_pid, SIGUSR1);
 		sem_wait(sem_open(NAMED_SEM, 0));
 	}
-
 	vmem->adm.g_count++;
 }
 
@@ -93,7 +91,7 @@ int vmem_read(int address) {
 	}
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
-	vmem_put_page_into_mem(address);
+	vmem_put_page_into_mem(page_idx);
 
 	vmem->pt.entries[page_idx].flags |= PTF_REF;
 	if(vmem->adm.g_count % UPDATE_AGE_COUNT == 0 && vmem->adm.page_rep_algo == VMEM_ALGO_AGING) {
@@ -111,7 +109,7 @@ void vmem_write(int address, int data) {
 	int page_idx = address / VMEM_PAGESIZE;
 	int offset = address - (VMEM_PAGESIZE * page_idx);
 
-	vmem_put_page_into_mem(address);
+	vmem_put_page_into_mem(page_idx);
 
 	vmem->pt.entries[page_idx].flags |= PTF_DIRTY; //seite wurde beschrieben
 	vmem->pt.entries[page_idx].flags |= PTF_REF; //seite wurde referenziert

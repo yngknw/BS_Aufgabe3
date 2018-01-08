@@ -373,7 +373,6 @@ void allocate_page(void) {
 			vmem->pt.entries[vmem->pt.framepage[freeFrameIdx]].flags &= ~PTF_DIRTY;
 		}
 	}
-
 	update_pt(freeFrameIdx);
 	fetch_page(vmem->adm.req_pageno);
 	dump_pt();
